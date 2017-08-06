@@ -15,7 +15,7 @@ install_file() {
   case "$1" in
     "redhat")
       echo "installing with yum..."
-      packages="ruby ruby-devel"
+      packages="ruby ruby-devel rubygems"
       yum install -y $packages
       ;;
     "debian")
