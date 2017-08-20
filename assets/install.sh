@@ -20,7 +20,7 @@ install_file() {
       salt-call --local rvm.install_ruby 2.0.0-p648
       salt-call --local rvm.set_default 2.0.0-p648
       /etc/profile.d/rvm.sh
-      export $PATH=$PATH:/usr/local/rvm/rubies/ruby-2.0.0-p648/bin
+      export PATH=$PATH:/usr/local/rvm/rubies/default/bin
       # packages="ruby ruby-devel rubygems"
       # yum install -y $packages
       ;;
