@@ -7,6 +7,10 @@ salt_version = config[:salt_version]
 salt_apt_repo = config[:salt_apt_repo]
 salt_apt_repo_key = config[:salt_apt_repo_key]
 salt_ppa = config[:salt_ppa]
+salt_yum_rpm_key = config[:salt_yum_rpm_key] % [salt_version]
+salt_yum_repo = config[:salt_yum_repo] % [salt_version]
+salt_yum_repo_key = config[:salt_yum_repo_key] % [salt_version]
+salt_yum_repo_latest = config[:salt_yum_repo_latest]
 
 <<-INSTALL
 sh -c '
@@ -30,6 +34,10 @@ then
     DISTRIB_CODENAME=$(lsb_release -s -c)
   fi
 
+  echo "-----> Install apt-transport-https"
+  #{sudo('apt-get')} update
+  #{sudo('apt-get')} install -y apt-transport-https gnupg
+
   echo "-----> Configuring apt repo for salt #{salt_version}"
   echo "deb #{salt_apt_repo}/#{salt_version} ${DISTRIB_CODENAME} main" | #{sudo('tee')} /etc/apt/sources.list.d/salt-#{salt_version}.list
 
@@ -40,47 +48,49 @@ then
   sleep 10
   echo "-----> Installing salt-minion (#{salt_version})"
   #{sudo('apt-get')} install -y python-support
-  #{sudo('apt-get')} install -y salt-minion salt-common
+  #{sudo('apt-get')} install -y salt-minion salt-common salt-master
 elif [ -z "${SALT_VERSION}" -a "#{salt_install}" = "distrib" ]
 then
   #{sudo('apt-get')} update
-  #{sudo('apt-get')} install -y salt-minion
+  #{sudo('apt-get')} install -y python-support
+  #{sudo('apt-get')} install -y salt-minion salt-master
 elif [ -z "${SALT_VERSION}" -a "#{salt_install}" = "ppa" ]
 then
   #{sudo('apt-add-repository')} -y #{salt_ppa}
   #{sudo('apt-get')} update
-  #{sudo('apt-get')} install -y salt-minion salt-common
+  #{sudo('apt-get')} install -y python-support
+  #{sudo('apt-get')} install -y salt-minion salt-common salt-master
 elif [ -z "${SALT_VERSION}" -a "#{salt_install}" = "yum" ]
 then
   if [ -z "#{salt_version}" ]
   then
     echo "-----> Installing yum repo for salt latest"
-    #{sudo('yum')} install https://repo.saltstack.com/yum/redhat/salt-repo-latest-2.el7.noarch.rpm
+    #{sudo('yum')} install #{salt_yum_repo_latest}
   else
     echo "-----> Installing yum repo for salt #{salt_version}"
-    #{sudo('rpm')} --import 'https://repo.saltstack.com/yum/redhat/7/x86_64/archive/#{salt_version}/SALTSTACK-GPG-KEY.pub'
+    #{sudo('rpm')} --import '#{salt_yum_rpm_key}'
     #{sudo('tee')} /etc/yum.repos.d/saltstack.repo <<EOL
 [saltstack-repo]
 name=SaltStack repo for RHEL/CentOS $releasever
-baseurl=#{Shellwords.escape("https://repo.saltstack.com/yum/redhat/$releasever/$basearch/archive/#{salt_version}")}
+baseurl=#{Shellwords.escape(salt_yum_repo)}
 enabled=1
 gpgcheck=1
-gpgkey=#{Shellwords.escape("https://repo.saltstack.com/yum/redhat/$releasever/$basearch/archive/#{salt_version}/SALTSTACK-GPG-KEY.pub")}
+gpgkey=#{Shellwords.escape(salt_yum_repo_key)}
 EOL
   fi
   #{sudo('yum')} clean expire-cache
   echo "-----> Installing salt-minion (#{salt_version})"
-  #{sudo('yum')} install -y salt-minion salt-common
+  #{sudo('yum')} install -y salt-minion salt-common salt-master
 fi
 
 # check again, now that an install of some form should have happened
-command -v salt-call >/dev/null 2>&1 && SALT_VERSION=$(salt-call --version|cut -d " " -f 2)
+command -v salt-call >/dev/null 2>&1 && FULL_SALT_VERSION=$(salt-call --version|cut -d " " -f 2)
 
 # extract short format of Salt version
-if [ ! -z "${SALT_VERSION}" ]
+if [ ! -z "${FULL_SALT_VERSION}" ]
 then
-  YEAR=$(echo "$SALT_VERSION" | cut -d "." -f1)
-  MONTH=$(echo "$SALT_VERSION" | cut -d "." -f2)
+  YEAR=$(echo "$FULL_SALT_VERSION" | cut -d "." -f1)
+  MONTH=$(echo "$FULL_SALT_VERSION" | cut -d "." -f2)
   SALT_VERSION="${YEAR}.${MONTH}"
 fi
 
@@ -94,10 +104,14 @@ then
   echo "salt_apt_repo = #{salt_apt_repo}"
   echo "salt_apt_repo_key = #{salt_apt_repo_key}"
   echo "salt_ppa = #{salt_ppa}"
+  echo "salt_yum_rpm_key = #{salt_yum_rpm_key}"
+  echo "salt_yum_repo = #{salt_yum_repo}"
+  echo "salt_yum_repo_key = #{salt_yum_repo_key}"
+  echo "salt_yum_repo_latest = #{salt_yum_repo_latest}"
   exit 2
-elif [ "${SALT_VERSION}" = "#{salt_version}" -o "#{salt_version}" = "latest" ]
+elif [ "${SALT_VERSION}" = "#{salt_version}" -o "#{salt_version}" = "latest" -o "#{salt_version}" = "${FULL_SALT_VERSION}" ]
 then
-  echo "You asked for #{salt_version} and you have ${SALT_VERSION} installed, sweet!"
+  echo "You asked for #{salt_version} and you have ${FULL_SALT_VERSION} installed, sweet!"
 elif [ ! -z "${SALT_VERSION}" -a "#{salt_install}" = "bootstrap" ]
 then
   echo "You asked for bootstrap install and you have got ${SALT_VERSION}, hope thats ok!"
