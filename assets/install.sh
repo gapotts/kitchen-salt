@@ -14,9 +14,14 @@ install_file() {
   echo "Installing the ruby things"
   case "$1" in
     "redhat")
-      echo "installing with yum..."
-      packages="ruby ruby-devel rubygems"
-      yum install -y $packages
+      echo "installing with rvm..."
+      sudo gpg2 --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3
+      salt-call --local rvm.install
+      salt-call --local rvm.install_ruby 2.0.0-p648
+      salt-call --local rvm.set_default 2.0.0-p648
+      source /etc/profile.d/rvm.sh
+      # packages="ruby ruby-devel rubygems"
+      # yum install -y $packages
       ;;
     "debian")
       echo "installing with apt..."
